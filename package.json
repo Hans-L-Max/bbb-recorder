@@ -1,0 +1,20 @@
+{
+  "name": "bbb-recorder",
+  "version": "1.0.0",
+  "description": "Automated BigBlueButton recorder and restreamer using Puppeteer and FFmpeg",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0",
+    "puppeteer-core": "^24.39.1",
+    "winston": "^3.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
