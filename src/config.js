@@ -56,7 +56,7 @@ const config = {
   captureFramerate: parseInt(optional('CAPTURE_FRAMERATE', '25'), 10),
 
   // Capture resolution (WxH)
-  captureResolution: optional('CAPTURE_RESOLUTION', '1280x720'),
+  captureResolution: optional('CAPTURE_RESOLUTION', '1920x1080'),
 };
 
 module.exports = config;
