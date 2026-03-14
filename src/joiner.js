@@ -113,7 +113,6 @@ async function joinMeeting(url, botName, display, accessCode = '') {
       `--display=${display}`,
       '--autoplay-policy=no-user-gesture-required',
       '--use-fake-ui-for-media-stream',
-      '--use-fake-device-for-media-stream',
     ],
     env: {
       ...process.env,
@@ -122,7 +121,7 @@ async function joinMeeting(url, botName, display, accessCode = '') {
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 720 });
+  await page.setViewport({ width: 1920, height: 1080 });
 
   // Navigate to the room / Greenlight join page
   logger.info(`[Joiner] Navigating to: ${url}`);
@@ -197,17 +196,19 @@ async function joinMeeting(url, botName, display, accessCode = '') {
 
   // Click "Listen Only" if the audio modal is visible
   try {
-    const listenOnlyHandle = await page.$(SELECTORS.listenOnlyButton);
-    if (listenOnlyHandle) {
-      logger.info('[Joiner] Audio dialog detected – clicking "Listen Only"…');
-      await listenOnlyHandle.click();
-      // Wait a moment for the dialog to close
-      await sleep(2000);
-    } else {
-      logger.warn('[Joiner] Listen-only button not found; skipping audio selection.');
-    }
+    logger.info('[Joiner] Waiting for audio dialog…');
+    await page.waitForSelector(SELECTORS.listenOnlyButton, { timeout: 15000 });
+    logger.info('[Joiner] Audio dialog detected – clicking "Listen Only"…');
+    await page.click(SELECTORS.listenOnlyButton);
+    // Wait for the dialog to close before proceeding
+    await page
+      .waitForSelector(SELECTORS.listenOnlyButton, { hidden: true, timeout: 10000 })
+      .catch(() => {
+        logger.warn('[Joiner] Audio dialog did not disappear within 10 s – continuing anyway.');
+      });
+    logger.info('[Joiner] Audio dialog dismissed.');
   } catch (err) {
-    logger.warn(`[Joiner] Could not click listen-only button: ${err.message}`);
+    logger.warn(`[Joiner] Could not dismiss audio dialog: ${err.message}`);
   }
 
   // Verify we are in the main meeting view
@@ -267,14 +268,6 @@ async function waitForMeetingEnd(page) {
       }
     }, 5000);
   });
-}
-
-/**
- * @param {number} ms
- * @returns {Promise<void>}
- */
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 module.exports = { joinMeeting, waitForMeetingEnd };

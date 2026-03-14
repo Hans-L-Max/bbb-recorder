@@ -9,7 +9,7 @@
 set -euo pipefail
 
 DISPLAY="${DISPLAY:-:99}"
-SCREEN_RESOLUTION="${SCREEN_RESOLUTION:-1280x720x24}"
+SCREEN_RESOLUTION="${SCREEN_RESOLUTION:-1920x1080x24}"
 PULSE_SOURCE="${PULSE_SOURCE:-virtual_sink.monitor}"
 
 # ── 1. Start Xvfb ─────────────────────────────────────────────────────────────
