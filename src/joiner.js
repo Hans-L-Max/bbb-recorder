@@ -5,9 +5,10 @@
  *
  * Uses Puppeteer (headless Chromium) to:
  *   1. Navigate to the BBB room URL.
- *   2. Enter a guest name and click Join.
- *   3. Wait for the audio dialog and click "Listen Only".
- *   4. Verify that the main conference view is loaded.
+ *   2. If the room has an access code, enter it on the first page and submit.
+ *   3. Enter a guest name on the (now visible) name-entry page and click Join.
+ *   4. Wait for the audio dialog and click "Listen Only".
+ *   5. Verify that the main conference view is loaded.
  *
  * Returns the open Puppeteer browser and page so the caller can keep watching
  * for the meeting-end event.
@@ -127,7 +128,38 @@ async function joinMeeting(url, botName, display, accessCode = '') {
   logger.info(`[Joiner] Navigating to: ${url}`);
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-  // Enter guest name (clear existing value then type)
+  // ── Step 1: Access code page (shown BEFORE the name-entry page) ───────────
+  // BBB/Greenlight shows an access-code form first when the room is protected.
+  // Only attempt this when an access code was configured.
+  if (accessCode) {
+    logger.info('[Joiner] Access code configured – checking for access code page…');
+    try {
+      await page.waitForSelector(SELECTORS.accessCodeInput, { timeout: 10000 });
+      logger.info('[Joiner] Access code page detected – entering code…');
+      await page.$eval(SELECTORS.accessCodeInput, (el, value) => {
+        el.focus();
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }, accessCode);
+
+      // Submit the access-code form and wait for the name-entry page to load.
+      // waitForNavigation is best-effort: some BBB variants update the page via
+      // AJAX without a full navigation, so a TimeoutError here is not fatal.
+      await page.waitForSelector(SELECTORS.joinButton, { timeout: 5000 });
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch((navErr) => {
+          logger.warn(`[Joiner] Navigation after access code submit did not complete: ${navErr.message}`);
+        }),
+        page.click(SELECTORS.joinButton),
+      ]);
+      logger.info('[Joiner] Access code submitted – proceeding to name-entry page.');
+    } catch (err) {
+      logger.warn(`[Joiner] Access code page not found or could not be submitted: ${err.message}`);
+    }
+  }
+
+  // ── Step 2: Name-entry page ───────────────────────────────────────────────
   logger.info(`[Joiner] Entering bot name: ${botName}`);
   try {
     await page.waitForSelector(SELECTORS.nameInput, { timeout: 30000 });
@@ -150,27 +182,6 @@ async function joinMeeting(url, botName, display, accessCode = '') {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, botName);
-
-  // Enter access code if one is configured and an input field is present
-  if (accessCode) {
-    logger.info('[Joiner] Access code configured – looking for access code input…');
-    try {
-      const accessCodeHandle = await page.$(SELECTORS.accessCodeInput);
-      if (accessCodeHandle) {
-        logger.info('[Joiner] Access code input found – entering code…');
-        await accessCodeHandle.evaluate((el, value) => {
-          el.focus();
-          el.value = value;
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        }, accessCode);
-      } else {
-        logger.warn('[Joiner] Access code input not found on page – skipping.');
-      }
-    } catch (err) {
-      logger.warn(`[Joiner] Could not enter access code: ${err.message}`);
-    }
-  }
 
   // Click Join
   logger.info('[Joiner] Clicking Join button…');
