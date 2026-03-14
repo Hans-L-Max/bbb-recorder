@@ -37,6 +37,7 @@ docker run --rm --env-file .env \
 |----------|----------|---------|-------------|
 | `BBB_ROOM_URL` | ✅ | – | Full Greenlight / BBB room URL |
 | `BOT_NAME` | | `Stream-Bot` | Display name used when joining |
+| `BBB_ACCESS_CODE` | | *(empty)* | Access code for password-protected rooms |
 | `POLL_INTERVAL_MS` | | `60000` | Waiting-room poll interval (ms) |
 | `RTMP_URL` | | *(empty)* | RTMP stream destination; leave empty for recording only |
 | `RECORDINGS_DIR` | | `/app/recordings` | Directory for output files |

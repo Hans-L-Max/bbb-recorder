@@ -30,7 +30,8 @@ async function main() {
   const { browser, page } = await joinMeeting(
     config.bbbRoomUrl,
     config.botName,
-    config.display
+    config.display,
+    config.accessCode
   );
 
   // ── Phase 3: Start recording / streaming ─────────────────────────────────

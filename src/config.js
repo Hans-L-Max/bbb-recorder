@@ -21,6 +21,9 @@ const config = {
   // BigBlueButton room URL (Greenlight link)
   bbbRoomUrl: required('BBB_ROOM_URL'),
 
+  // Optional access code required to enter a protected BBB room
+  accessCode: optional('BBB_ACCESS_CODE', ''),
+
   // Name shown in the conference when the bot joins
   botName: optional('BOT_NAME', 'Stream-Bot'),
 

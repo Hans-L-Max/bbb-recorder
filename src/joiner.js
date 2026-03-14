@@ -26,6 +26,18 @@ const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
 const SELECTORS = {
   // Greenlight "join as guest" page
   nameInput: 'input#name, input[name="name"], input[id="guest-name"], input[placeholder*="ame"]',
+
+  // Access code / room password (present only when the room owner has set one)
+  accessCodeInput: [
+    'input#access-code',
+    'input[name="access_code"]',
+    'input[id="access_code"]',
+    'input[name="room_access_code"]',
+    'input[placeholder*="access" i]',
+    'input[placeholder*="code" i]',
+    'input[placeholder*="password" i]',
+  ].join(', '),
+
   joinButton: 'button[type="submit"], input[type="submit"], button.btn-primary, #room-join',
 
   // BBB HTML5 client – audio modal
@@ -62,12 +74,13 @@ const SELECTORS = {
 /**
  * Launch Puppeteer, join the BBB room, and select "Listen Only" audio.
  *
- * @param {string} url      BBB room URL.
- * @param {string} botName  Display name for the bot.
- * @param {string} display  X display string (e.g. ":99").
+ * @param {string} url         BBB room URL.
+ * @param {string} botName     Display name for the bot.
+ * @param {string} display     X display string (e.g. ":99").
+ * @param {string} [accessCode] Optional access code for protected rooms.
  * @returns {Promise<{browser: import('puppeteer-core').Browser, page: import('puppeteer-core').Page}>}
  */
-async function joinMeeting(url, botName, display) {
+async function joinMeeting(url, botName, display, accessCode = '') {
   logger.info('[Joiner] Launching Chromium…');
 
   const browser = await puppeteer.launch({
@@ -106,6 +119,27 @@ async function joinMeeting(url, botName, display) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, botName);
+
+  // Enter access code if one is configured and an input field is present
+  if (accessCode) {
+    logger.info('[Joiner] Access code configured – looking for access code input…');
+    try {
+      const accessCodeHandle = await page.$(SELECTORS.accessCodeInput);
+      if (accessCodeHandle) {
+        logger.info('[Joiner] Access code input found – entering code…');
+        await accessCodeHandle.evaluate((el, value) => {
+          el.focus();
+          el.value = value;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }, accessCode);
+      } else {
+        logger.warn('[Joiner] Access code input not found on page – skipping.');
+      }
+    } catch (err) {
+      logger.warn(`[Joiner] Could not enter access code: ${err.message}`);
+    }
+  }
 
   // Click Join
   logger.info('[Joiner] Clicking Join button…');
