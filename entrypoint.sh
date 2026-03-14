@@ -23,7 +23,17 @@ sleep 1
 
 # ── 2. Start PulseAudio ───────────────────────────────────────────────────────
 echo "[Entrypoint] Starting PulseAudio…"
-pulseaudio --start --exit-idle-time=-1 --daemonize=no &
+# PULSE_SERVER is a *client* hint for connecting to an existing server.  When it
+# is set in the environment, PulseAudio's own startup code interprets it as a
+# configured server address and refuses to autospawn — especially as root.
+# Strip it from the daemon's environment so the daemon starts unconditionally.
+# When running as root, --system mode is required (PulseAudio rejects per-user
+# daemon startup as root for security reasons).
+if [ "$(id -u)" = "0" ]; then
+  env -u PULSE_SERVER pulseaudio --system --exit-idle-time=-1 --daemonize=no &
+else
+  env -u PULSE_SERVER pulseaudio --exit-idle-time=-1 --daemonize=no &
+fi
 PULSE_PID=$!
 echo "[Entrypoint] PulseAudio PID: ${PULSE_PID}"
 

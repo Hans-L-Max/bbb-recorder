@@ -24,8 +24,17 @@ const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '/usr/bin/chromium';
  * Adjust these if your BBB version uses different class names / aria-labels.
  */
 const SELECTORS = {
-  // Greenlight "join as guest" page
-  nameInput: 'input#name, input[name="name"], input[id="guest-name"], input[placeholder*="ame"]',
+  // Greenlight "join as guest" page + BBB HTML5 client guest-join form.
+  // Ordered from most specific to most generic; extend as BBB versions evolve.
+  nameInput: [
+    'input#name',
+    'input[name="name"]',
+    'input[id="guest-name"]',
+    'input[placeholder*="ame"]',          // "Name", "Ihr Name", "Your name", …
+    'input[data-test="name"]',             // BBB HTML5 client
+    'input[data-test="inputField"]',       // BBB HTML5 (alternate)
+    'input[aria-label*="name" i]',         // Accessibility-based label
+  ].join(', '),
 
   // Access code / room password (present only when the room owner has set one)
   accessCodeInput: [
@@ -38,7 +47,14 @@ const SELECTORS = {
     'input[placeholder*="password" i]',
   ].join(', '),
 
-  joinButton: 'button[type="submit"], input[type="submit"], button.btn-primary, #room-join',
+  joinButton: [
+    'button[type="submit"]',
+    'input[type="submit"]',
+    'button.btn-primary',
+    '#room-join',
+    '[data-test="joinButton"]',            // BBB HTML5 client
+    'button[data-test="join"]',            // BBB HTML5 (alternate)
+  ].join(', '),
 
   // BBB HTML5 client – audio modal
   // BBB shows a modal with "Microphone" and "Listen Only" buttons
@@ -49,6 +65,7 @@ const SELECTORS = {
     '#listenOnlyBtn',
     '.listen-only',
     'button.connectBtn',
+    '[data-test="listenOnlyButton"]',      // BBB HTML5 client
   ].join(', '),
 
   // Confirmation that we are inside the meeting
@@ -112,7 +129,21 @@ async function joinMeeting(url, botName, display, accessCode = '') {
 
   // Enter guest name (clear existing value then type)
   logger.info(`[Joiner] Entering bot name: ${botName}`);
-  await page.waitForSelector(SELECTORS.nameInput, { timeout: 30000 });
+  try {
+    await page.waitForSelector(SELECTORS.nameInput, { timeout: 30000 });
+  } catch (err) {
+    // Log page URL and title to aid debugging, then re-throw
+    try {
+      const title = await page.title();
+      const currentUrl = page.url();
+      logger.error(`[Joiner] Name input not found. Page: "${title}" at ${currentUrl}`);
+      await page.screenshot({ path: '/tmp/bbb-joiner-debug.png', fullPage: true });
+      logger.error('[Joiner] Debug screenshot saved to /tmp/bbb-joiner-debug.png');
+    } catch (screenshotErr) {
+      logger.warn(`[Joiner] Could not capture debug screenshot: ${screenshotErr.message}`);
+    }
+    throw err;
+  }
   await page.$eval(SELECTORS.nameInput, (el, value) => {
     el.focus();
     el.value = value;
