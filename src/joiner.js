@@ -60,13 +60,26 @@ const SELECTORS = {
   // BBB HTML5 client – audio modal
   // BBB shows a modal with "Microphone" and "Listen Only" buttons
   listenOnlyButton: [
+    '[data-test="listenOnlyButton"]',      // BBB HTML5 client (primary)
     'button[aria-label="Listen only"]',
     'button[aria-label="Nur zuhören"]',
     'button[aria-label="Nur Zuhören"]',
     '#listenOnlyBtn',
     '.listen-only',
     'button.connectBtn',
-    '[data-test="listenOnlyButton"]',      // BBB HTML5 client
+  ].join(', '),
+
+  // Generic close/dismiss buttons for any modal that might appear after
+  // joining (e.g. cookie notice, browser-support banners, overlay prompts).
+  genericCloseButton: [
+    'button[aria-label="Close"]',
+    'button[aria-label="Schließen"]',
+    'button[aria-label="close"]',
+    '[data-test="closeModal"]',
+    '[data-test="modalDismissButton"]',
+    '.modal-close',
+    '.close-btn',
+    'button.close',
   ].join(', '),
 
   // Confirmation that we are inside the meeting
@@ -113,6 +126,11 @@ async function joinMeeting(url, botName, display, accessCode = '') {
       `--display=${display}`,
       '--autoplay-policy=no-user-gesture-required',
       '--use-fake-ui-for-media-stream',
+      // Ensure the browser window fills the entire virtual display so FFmpeg
+      // captures a full 1920×1080 frame without black bars.
+      '--window-position=0,0',
+      '--window-size=1920,1080',
+      '--start-maximized',
     ],
     env: {
       ...process.env,
@@ -211,11 +229,48 @@ async function joinMeeting(url, botName, display, accessCode = '') {
     logger.warn(`[Joiner] Could not dismiss audio dialog: ${err.message}`);
   }
 
+  // Dismiss any remaining overlay modals (e.g. cookie notices, banners) that
+  // could block the recording view.
+  await dismissRemainingModals(page);
+
   // Verify we are in the main meeting view
   await verifyInMeeting(page);
 
   logger.info('[Joiner] Successfully joined the meeting.');
   return { browser, page };
+}
+
+/**
+ * Try to dismiss any modal dialogs that may still be open after the audio
+ * selection step.  These include generic close buttons, overlay banners, and
+ * any other BBB UI element that sits in front of the presentation view.
+ * Loops until no more dismissible modals are found (up to maxAttempts).
+ *
+ * @param {import('puppeteer-core').Page} page
+ * @param {number} [maxAttempts=5]
+ */
+async function dismissRemainingModals(page, maxAttempts = 5) {
+  logger.info('[Joiner] Checking for remaining modal dialogs…');
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const closeBtn = await page.$(SELECTORS.genericCloseButton);
+      if (!closeBtn) {
+        logger.info('[Joiner] No remaining modals detected.');
+        break;
+      }
+      logger.info(`[Joiner] Found a remaining modal (attempt ${attempt}) – clicking close button…`);
+      await closeBtn.click();
+      // Wait for the clicked element to be removed from the DOM before checking again
+      await page
+        .waitForSelector(SELECTORS.genericCloseButton, { hidden: true, timeout: 5000 })
+        .catch(() => {
+          logger.warn('[Joiner] Modal did not disappear within 5 s – continuing.');
+        });
+    } catch (err) {
+      logger.warn(`[Joiner] Could not dismiss remaining modal: ${err.message}`);
+      break;
+    }
+  }
 }
 
 /**
