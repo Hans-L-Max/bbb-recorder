@@ -27,10 +27,25 @@ echo "[Entrypoint] Starting PulseAudio…"
 # is set in the environment, PulseAudio's own startup code interprets it as a
 # configured server address and refuses to autospawn — especially as root.
 # Strip it from the daemon's environment so the daemon starts unconditionally.
+#
 # When running as root, --system mode is required (PulseAudio rejects per-user
 # daemon startup as root for security reasons).
+#
+# We use -n (no default config) to skip loading system.pa, which attempts a
+# D-Bus system-bus connection not available in Docker and loads the native
+# protocol *without* anonymous auth.  Instead we load only the two modules we
+# need and enable anonymous authentication so that clients (pactl, FFmpeg) can
+# connect without a cookie file.
 if [ "$(id -u)" = "0" ]; then
-  env -u PULSE_SERVER pulseaudio --system --exit-idle-time=-1 --daemonize=no &
+  # Ensure the directory for the system-mode socket exists
+  install -d -m 755 /run/pulse
+  env -u PULSE_SERVER pulseaudio \
+    --system \
+    --daemonize=no \
+    --exit-idle-time=-1 \
+    -n \
+    --load="module-null-sink sink_name=virtual_sink sink_properties=device.description=Virtual_Sink" \
+    --load="module-native-protocol-unix auth-anonymous=1" &
 else
   env -u PULSE_SERVER pulseaudio --exit-idle-time=-1 --daemonize=no &
 fi
@@ -47,9 +62,14 @@ for i in $(seq 1 10); do
   sleep 1
 done
 
-# ── 3. Create a virtual audio sink so FFmpeg has something to capture ──────────
-echo "[Entrypoint] Loading virtual PulseAudio null sink…"
-pactl load-module module-null-sink sink_name=virtual_sink sink_properties=device.description="Virtual Sink" || true
+# ── 3. Configure the virtual audio sink ───────────────────────────────────────
+if [ "$(id -u)" != "0" ]; then
+  # In non-root (user) mode the null-sink is not pre-loaded; create it now.
+  echo "[Entrypoint] Loading virtual PulseAudio null sink…"
+  pactl load-module module-null-sink sink_name=virtual_sink \
+    sink_properties=device.description=Virtual_Sink || true
+fi
+echo "[Entrypoint] Configuring virtual PulseAudio sink as default…"
 pactl set-default-sink virtual_sink || true
 pactl set-default-source "${PULSE_SOURCE}" || true
 
