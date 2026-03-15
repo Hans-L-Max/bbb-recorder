@@ -45,10 +45,10 @@ function buildOutputPath(dir) {
  * @param {string}  opts.recordingsDir  Directory for the output file.
  * @param {string}  [opts.rtmpUrl]      Optional RTMP destination URL.
  * @param {number}  [opts.framerate]    Capture framerate (default 25).
- * @param {string}  [opts.resolution]   Capture resolution, e.g. "1280x720".
+ * @param {string}  [opts.resolution]   Capture resolution, e.g. "1920x1080".
  * @returns {{ process: import('child_process').ChildProcess, outputPath: string }}
  */
-function startRecording({ display, pulseSource, recordingsDir, rtmpUrl, framerate = 25, resolution = '1280x720' }) {
+function startRecording({ display, pulseSource, recordingsDir, rtmpUrl, framerate = 25, resolution = '1920x1080' }) {
   // Ensure output directory exists
   fs.mkdirSync(recordingsDir, { recursive: true });
 
@@ -118,7 +118,7 @@ function stopRecording(ffmpegProcess) {
  * @param {object} opts
  * @returns {string[]}
  */
-function buildFfmpegArgs({ display, pulseSource, outputPath, rtmpUrl, framerate = 25, resolution = '1280x720' }) {
+function buildFfmpegArgs({ display, pulseSource, outputPath, rtmpUrl, framerate = 25, resolution = '1920x1080' }) {
   // Common input / encode settings
   const args = [
     '-loglevel', 'warning',

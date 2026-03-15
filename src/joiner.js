@@ -109,10 +109,18 @@ const SELECTORS = {
  * @param {string} botName     Display name for the bot.
  * @param {string} display     X display string (e.g. ":99").
  * @param {string} [accessCode] Optional access code for protected rooms.
+ * @param {string} [resolution] Capture resolution string, e.g. "1920x1080".
  * @returns {Promise<{browser: import('puppeteer-core').Browser, page: import('puppeteer-core').Page}>}
  */
-async function joinMeeting(url, botName, display, accessCode = '') {
+async function joinMeeting(url, botName, display, accessCode = '', resolution = '1920x1080') {
   logger.info('[Joiner] Launching Chromium…');
+
+  const parts = resolution.split('x').map(Number);
+  const winWidth = parts[0];
+  const winHeight = parts[1];
+  if (!winWidth || !winHeight || isNaN(winWidth) || isNaN(winHeight)) {
+    throw new Error(`[Joiner] Invalid capture resolution: "${resolution}". Expected format: WxH (e.g. "1920x1080").`);
+  }
 
   const browser = await puppeteer.launch({
     executablePath: CHROMIUM_PATH,
@@ -127,9 +135,9 @@ async function joinMeeting(url, botName, display, accessCode = '') {
       '--autoplay-policy=no-user-gesture-required',
       '--use-fake-ui-for-media-stream',
       // Ensure the browser window fills the entire virtual display so FFmpeg
-      // captures a full 1920×1080 frame without black bars.
+      // captures a full frame without black bars.
       '--window-position=0,0',
-      '--window-size=1920,1080',
+      `--window-size=${winWidth},${winHeight}`,
       '--start-maximized',
     ],
     env: {
@@ -139,7 +147,7 @@ async function joinMeeting(url, botName, display, accessCode = '') {
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1920, height: 1080 });
+  await page.setViewport({ width: winWidth, height: winHeight });
 
   // Navigate to the room / Greenlight join page
   logger.info(`[Joiner] Navigating to: ${url}`);

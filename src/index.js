@@ -31,7 +31,8 @@ async function main() {
     config.bbbRoomUrl,
     config.botName,
     config.display,
-    config.accessCode
+    config.accessCode,
+    config.captureResolution
   );
 
   // ── Phase 3: Start recording / streaming ─────────────────────────────────
