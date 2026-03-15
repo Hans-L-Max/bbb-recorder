@@ -73,6 +73,14 @@ echo "[Entrypoint] Configuring virtual PulseAudio sink as default…"
 pactl set-default-sink virtual_sink || true
 pactl set-default-source "${PULSE_SOURCE}" || true
 
+# Export PULSE_SERVER so that Node.js and Chromium connect to the correct
+# PulseAudio socket.  In system (root) mode the socket lives at
+# /run/pulse/native; in user mode the default discovery path is used.
+if [ "$(id -u)" = "0" ]; then
+  export PULSE_SERVER="unix:/run/pulse/native"
+  echo "[Entrypoint] PULSE_SERVER set to ${PULSE_SERVER}"
+fi
+
 # ── 4. Launch the Node.js application ────────────────────────────────────────
 echo "[Entrypoint] Starting bbb-recorder…"
 exec node /app/src/index.js
